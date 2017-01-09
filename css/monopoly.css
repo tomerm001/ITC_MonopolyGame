@@ -199,8 +199,32 @@ body{
     background-color: #d061cd;
 }
 
+.player#player5 , .player5.cell .content{
+    background-color: #d21411;
+}
+
+.player#player6 , .player6.cell .content{
+    background-color: #0000ed;
+}
+
+
+
+
 .player.current-turn{
     background-image:url(../images/crown.png);
+    background-size:contain;
+    background-position:center;
+}
+
+.player.jailed{
+    background-image:url(../images/sad.png);
+    background-size:contain;
+    background-position:center;
+}
+
+.player1 .player.player1, .player2 .player.player2, .player3 .player.player3,
+.player4 .player.player4, .player5 .player.player5, .player6 .player.player6 {
+    background-image:url(../images/happy.png);
     background-size:contain;
     background-position:center;
 }

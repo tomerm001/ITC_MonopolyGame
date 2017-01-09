@@ -1,7 +1,8 @@
 var Monopoly = {};
 Monopoly.allowRoll = true;  //control useraction
-Monopoly.moneyAtStart = 1000;  //default value for money to start game
+Monopoly.moneyAtStart = 300;  //default value for money to start game
 Monopoly.doubleCounter = 0;   //counts amount of double throws
+Monopoly.maxPlayers  = 6; //maximum amount of players
 
 
 // =====  INIT FUNCTION FOR GAME  =====
@@ -356,9 +357,50 @@ Monopoly.handleChanceCard = function(player){
 
 //handle community card, not implemented
 Monopoly.handleCommunityCard = function(player){
-    //TODO: implement this method
-    alert("not implemented yet!")
-    Monopoly.setNextPlayerTurn();
+
+    //Open popup window for chance card
+    var popup = Monopoly.getPopup("community");
+    popup.find(".popup-content").addClass("loading-state");
+
+ 
+    //Make an AJAX call to get a new card
+    $.get("https://itcmonopoly.appspot.com//get_random_community_card", function(communJson){
+
+        console.log(communJson);
+
+         //call back function with results
+        //update content of popup window
+        popup.find(".popup-content #text-placeholder").text(communJson["content"]);
+        popup.find(".popup-title").text(communJson["title"]);
+
+        //Remove the class of loading 
+        popup.find(".popup-content").removeClass("loading-state");
+
+        //add card content to the button (amount and action type)
+        popup.find(".popup-content button").attr("data-action",communJson["action"]).attr("data-amount",communJson["amount"]);
+
+    },"json");
+
+
+
+     //add event listner to button
+    popup.find("button").unbind("click").bind("click",function(){
+
+        //get DOM of button
+        var currentBtn = $(this);
+
+        //update variables with button content of card
+        var action = currentBtn.attr("data-action");
+        var amount = currentBtn.attr("data-amount");
+        console.log("testing the action and amount " + action + " " + amount)
+
+        //handle the action provided by the card
+        Monopoly.handleAction(player,action,amount);
+    });
+
+    //show the result of the popup
+    Monopoly.showPopup("community");
+     
 };
 
 //send user to jail, udate class and add jail time counter
@@ -434,6 +476,8 @@ Monopoly.handleBuy = function(player,propertyCell,propertyCost){
     
     //if not sufficient funds
     if (playersMoney < propertyCost){
+
+        Monopoly.playSound("woopwoop");
         Monopoly.showErrorMsg();
     }
     
@@ -501,6 +545,9 @@ Monopoly.createPlayers = function(numOfPlayers){
 
         var player = $("<div />").addClass("player shadowed").attr("id","player" + i).attr("title","player" + i + ": $" + Monopoly.moneyAtStart);
 
+        //add class of playernumber
+        player.addClass("player" + i);
+
         //append user to start cell
         startCell.find(".content").append(player);
         
@@ -541,17 +588,23 @@ Monopoly.handlePassedGo = function(){
     Monopoly.updatePlayersMoney(player,Monopoly.moneyAtStart/10);
 };
 
-
+//check if input is valid
 Monopoly.isValidInput = function(validate,value){
+    
     var isValid = false;
+    
     switch(validate){
+        
         case "numofplayers":
-            if(value > 1 && value <= 4){
+            if(value > 1 && value <= Monopoly.maxPlayers){
                 isValid = true;
             }
-            //TODO: remove when done
+            else {
+
             console.log("the val " + value)
-            isValid = true;
+            isValid = false;
+        }
+
             break;
     }
 
