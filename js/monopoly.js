@@ -1,8 +1,10 @@
 var Monopoly = {};
 Monopoly.allowRoll = true;  //control useraction
-Monopoly.moneyAtStart = 300;  //default value for money to start game
+Monopoly.moneyAtStart = 3;  //default value for money to start game
 Monopoly.doubleCounter = 0;   //counts amount of double throws
+Monopoly.doubleTrown = false; //each throw check if double thrown
 Monopoly.maxPlayers  = 6; //maximum amount of players
+Monopoly.playersRemoved = 0;
 
 
 // =====  INIT FUNCTION FOR GAME  =====
@@ -31,6 +33,60 @@ Monopoly.init = function(){
 Monopoly.start = function(){
     Monopoly.showPopup("intro")
 };
+
+//remove player from game
+Monopoly.removePlayer = function (player){
+
+    //player name in string
+    var playerString = player.attr("id");
+
+    //find all properties of user
+    var allProprties = $(".game.cell.property"+ "." + playerString);
+
+    //remove all attributes
+    allProprties.addClass("available");
+    allProprties.removeAttr('data-owner');
+    allProprties.removeAttr('data-rent');
+
+
+    //remove player from class of property
+    allProprties.removeClass(playerString);
+
+    //add to removed counter
+    Monopoly.playersRemoved++;
+
+    //remove player from game board / DOM
+    player.remove();
+
+}
+
+
+//user is bankrupt
+Monopoly.handleBroke = function(player) {
+
+    //show popup for you have to pay rent
+    var popup = Monopoly.getPopup("broke");
+
+    //add event listener
+    popup.find("button").unbind("click").bind("click",function(){
+        
+        Monopoly.setNextPlayerTurn();
+        Monopoly.removePlayer(player);
+       
+        Monopoly.closePopup();
+
+    });
+
+    Monopoly.closePopup();
+
+
+    //show pop up window
+    Monopoly.showPopup("broke");
+
+    //play sound of broke
+    Monopoly.playSound("woopwoop");
+}
+
 
 //adds event listner to dice, only works if allowRoll = true
 Monopoly.initDice = function(){
@@ -63,13 +119,15 @@ Monopoly.updatePlayersMoney = function(player,amount){
 
     //check if broke
     if (playersMoney < 0 ){
-        alert("you are broke!")
+        Monopoly.handleBroke(player);
+        return true;
     }
-
-    //update title and data-money attribute
-    player.attr("data-money",playersMoney);
-    player.attr("title",player.attr("id") + ": $" + playersMoney);
-    Monopoly.playSound("chaching");
+    else{
+        //update title and data-money attribute
+        player.attr("data-money",playersMoney);
+        player.attr("title",player.attr("id") + ": $" + playersMoney);
+        Monopoly.playSound("chaching");
+    }
 };
 
 
@@ -90,10 +148,12 @@ Monopoly.rollDice = function(){
     //if dice hits double add to counter
     if (result1 == result2){
         Monopoly.doubleCounter++;
+        Monopoly.doubleTrown = true;
     }
 
     //get current activae player, DOM with class current player
     var currentPlayer = Monopoly.getCurrentPlayer();
+
 
     //move the player according to the ammount of dice
     Monopoly.handleAction(currentPlayer,"move",result1 + result2);
@@ -178,50 +238,88 @@ Monopoly.handleTurn = function(){
 //update current player to next player taking into account if user is in jail
 Monopoly.setNextPlayerTurn = function(){
 
-    //get DOM object of current player
-    var currentPlayerTurn = Monopoly.getCurrentPlayer();
+    //check if user trew a double and if its not its third time
+    if(Monopoly.doubleTrown && (Monopoly.doubleCounter < 3 )){
 
-    // get id of player
-    var playerId = parseInt(currentPlayerTurn.attr("id").replace("player",""));
+        //get DOM object of current player
+        var currentPlayerTurn = Monopoly.getCurrentPlayer();
 
-    //increase id number
-    var nextPlayerId = playerId + 1;
+        //reset double throw
+        Monopoly.doubleTrown = false;
 
-    //check amount of players and if more chnage back to 1
-    if (nextPlayerId > $(".player").length){
-        nextPlayerId = 1;
-    }
+        if (currentPlayerTurn.is(".jailed")){
 
-    //remove class from current player
-    currentPlayerTurn.removeClass("current-turn");
+            //reset double counter
+            Monopoly.doubleCounter = 0;
 
-    //get object of next player
-    var nextPlayer = $(".player#player" + nextPlayerId);
-
-    //add class to new player
-    nextPlayer.addClass("current-turn");
-
-    //check if the player is in jail
-    if (nextPlayer.is(".jailed")){
-
-        //check how long in jail
-        var currentJailTime = parseInt(nextPlayer.attr("data-jail-time"));
-        currentJailTime++;
-
-        //update new time in jail
-        nextPlayer.attr("data-jail-time",currentJailTime);
-        if (currentJailTime > 3){
-
-            //if already in jail 3 turns join game for next turn
-            nextPlayer.removeClass("jailed");
-            nextPlayer.removeAttr("data-jail-time");
+            //Set the next player (will not enter next round)
+            Monopoly.setNextPlayerTurn();
+            return;
         }
-
-        //Set the next player (will not enter if clause for jail this time)
-        Monopoly.setNextPlayerTurn();
-        return;
+    
     }
 
+    //if no double
+    else{
+        //get DOM object of current player
+        var currentPlayerTurn = Monopoly.getCurrentPlayer();
+
+        // get id of player
+        var playerId = parseInt(currentPlayerTurn.attr("id").replace("player",""));
+
+        var nextPlayerId = playerId;
+
+        do{
+            //increase id number
+            var nextPlayerId = nextPlayerId + 1;
+
+            //check amount of players and if more chnage back to 1
+            if (nextPlayerId > (($(".player").length) + Monopoly.playersRemoved)){
+                nextPlayerId = 1;
+            }
+
+            //get object of next player
+            var nextPlayer = $(".player#player" + nextPlayerId);
+
+            //check if playerIsInGame
+        }while(nextPlayer.length == 0);
+
+
+        //remove class from current player
+        currentPlayerTurn.removeClass("current-turn");
+
+        //get object of next player
+        var nextPlayer = $(".player#player" + nextPlayerId);
+
+        
+        //add class to new player
+        nextPlayer.addClass("current-turn");
+
+
+        //reset double counter
+        Monopoly.doubleCounter = 0;
+
+        //check if the player is in jail
+        if (nextPlayer.is(".jailed")){
+
+            //check how long in jail
+            var currentJailTime = parseInt(nextPlayer.attr("data-jail-time"));
+            currentJailTime++;
+
+            //update new time in jail
+            nextPlayer.attr("data-jail-time",currentJailTime);
+            if (currentJailTime > 3){
+
+                //if already in jail 3 turns join game for next turn
+                nextPlayer.removeClass("jailed");
+                nextPlayer.removeAttr("data-jail-time");
+            }
+
+            //Set the next player (will not enter if clause for jail this time)
+            Monopoly.setNextPlayerTurn();
+            return;
+        }
+    }
 
     Monopoly.closePopup();
 
@@ -368,6 +466,7 @@ Monopoly.handleCommunityCard = function(player){
 
         console.log(communJson);
 
+
          //call back function with results
         //update content of popup window
         popup.find(".popup-content #text-placeholder").text(communJson["content"]);
@@ -393,6 +492,8 @@ Monopoly.handleCommunityCard = function(player){
         var action = currentBtn.attr("data-action");
         var amount = currentBtn.attr("data-amount");
         console.log("testing the action and amount " + action + " " + amount)
+
+        Monopoly.closePopup();
 
         //handle the action provided by the card
         Monopoly.handleAction(player,action,amount);
@@ -507,6 +608,8 @@ Monopoly.handleBuy = function(player,propertyCell,propertyCost){
 //function to handle moves, payments and jail for a  player
 Monopoly.handleAction = function(player,action,amount){
     console.log(action)
+    var broke = false;
+
     switch(action){
         case "move":
        	    console.log(amount)
@@ -517,11 +620,13 @@ Monopoly.handleAction = function(player,action,amount){
         case "pay":
 
             //update wallet
-            Monopoly.updatePlayersMoney(player,amount);
+            broke = Monopoly.updatePlayersMoney(player,amount);
 
-            //update to  next player
-            Monopoly.setNextPlayerTurn();
-            break;
+            if(!broke){
+                //update to  next player
+                Monopoly.setNextPlayerTurn();
+            }
+                break;
 
         case "jail":
 
@@ -529,7 +634,11 @@ Monopoly.handleAction = function(player,action,amount){
             Monopoly.sendToJail(player);
             break;
     };
-    Monopoly.closePopup();
+
+    if(!broke){
+        Monopoly.closePopup();
+    }
+    
 };
 
 
@@ -585,7 +694,7 @@ Monopoly.handlePassedGo = function(){
     var player = Monopoly.getCurrentPlayer();
 
     //update balance of player
-    Monopoly.updatePlayersMoney(player,Monopoly.moneyAtStart/10);
+    Monopoly.updatePlayersMoney(player,((-1)*(Monopoly.moneyAtStart/10)));
 };
 
 //check if input is valid
