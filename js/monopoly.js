@@ -58,6 +58,11 @@ Monopoly.removePlayer = function (player){
     //remove player from game board / DOM
     player.remove();
 
+    //check if won 
+    if($(".player").length == 1){
+        alert("you won");
+    }
+
 }
 
 
